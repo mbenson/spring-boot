@@ -343,7 +343,7 @@ public class ConfigFileApplicationListener implements EnvironmentPostProcessor,
 		}
 
 		public void load() throws IOException {
-			this.propertiesLoader = new PropertySourcesLoader();
+			this.propertiesLoader = new PropertySourcesLoader(this.environment, this.resourceLoader);
 			this.activatedProfiles = false;
 			this.profiles = Collections.asLifoQueue(new LinkedList<Profile>());
 			this.processedProfiles = new LinkedList<Profile>();

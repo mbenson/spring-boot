@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2015 the original author or authors.
+ * Copyright 2012-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,9 +25,13 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
+import org.springframework.context.EnvironmentAware;
+import org.springframework.context.ResourceLoaderAware;
+import org.springframework.core.env.Environment;
 import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.ResourceLoader;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -49,21 +53,29 @@ public class PropertySourcesLoader {
 	/**
 	 * Create a new {@link PropertySourceLoader} instance backed by a new
 	 * {@link MutablePropertySources}.
+	 * @param environment {@link Environment} for {@link EnvironmentAware}
+	 * {@link PropertySourceLoader}s
+	 * @param resourceLoader {@link ResourceLoader} for {@link ResourceLoaderAware}
+	 * {@link PropertySourceLoader}s
 	 */
-	public PropertySourcesLoader() {
-		this(new MutablePropertySources());
+	public PropertySourcesLoader(Environment environment, ResourceLoader resourceLoader) {
+		this(environment, resourceLoader, new MutablePropertySources());
 	}
 
 	/**
 	 * Create a new {@link PropertySourceLoader} instance backed by the specified
 	 * {@link MutablePropertySources}.
+	 * @param environment {@link Environment} for {@link EnvironmentAware}
+	 * {@link PropertySourceLoader}s
+	 * @param resourceLoader {@link ResourceLoader} for {@link ResourceLoaderAware}
+	 * {@link PropertySourceLoader}s
 	 * @param propertySources the destination property sources
 	 */
-	public PropertySourcesLoader(MutablePropertySources propertySources) {
+	public PropertySourcesLoader(Environment environment, ResourceLoader resourceLoader,
+			MutablePropertySources propertySources) {
 		Assert.notNull(propertySources, "PropertySources must not be null");
 		this.propertySources = propertySources;
-		this.loaders = SpringFactoriesLoader.loadFactories(PropertySourceLoader.class,
-				getClass().getClassLoader());
+		this.loaders = getPropertySourceLoaders(environment, resourceLoader);
 	}
 
 	/**
@@ -207,4 +219,18 @@ public class PropertySourcesLoader {
 		return fileExtensions;
 	}
 
+	private List<PropertySourceLoader> getPropertySourceLoaders(Environment environment,
+			ResourceLoader resourceLoader) {
+		List<PropertySourceLoader> result = SpringFactoriesLoader
+				.loadFactories(PropertySourceLoader.class, getClass().getClassLoader());
+		for (PropertySourceLoader loader : result) {
+			if (loader instanceof EnvironmentAware) {
+				((EnvironmentAware) loader).setEnvironment(environment);
+			}
+			if (loader instanceof ResourceLoaderAware) {
+				((ResourceLoaderAware) loader).setResourceLoader(resourceLoader);
+			}
+		}
+		return result;
+	}
 }
