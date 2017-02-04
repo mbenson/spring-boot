@@ -1,5 +1,5 @@
 /*
- * Copyright 2012-2016 the original author or authors.
+ * Copyright 2012-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import org.springframework.boot.bind.RelaxedDataBinder;
 import org.springframework.core.env.Environment;
 import org.springframework.core.env.MutablePropertySources;
 import org.springframework.core.env.PropertiesPropertySource;
+import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 
@@ -69,18 +70,17 @@ public class SpringProfileDocumentMatcher implements DocumentMatcher {
 	@Override
 	public MatchStatus matches(Properties properties) {
 		List<String> profiles = extractSpringProfiles(properties);
-		ProfilesMatcher profilesMatcher = getProfilesMatcher();
 		Set<String> negative = extractProfiles(profiles, ProfileType.NEGATIVE);
 		Set<String> positive = extractProfiles(profiles, ProfileType.POSITIVE);
 		if (!CollectionUtils.isEmpty(negative)) {
-			if (profilesMatcher.matches(negative) == MatchStatus.FOUND) {
+			if (getProfilesMatcher(ProfileType.NEGATIVE).matches(negative) == MatchStatus.FOUND) {
 				return MatchStatus.NOT_FOUND;
 			}
 			if (CollectionUtils.isEmpty(positive)) {
 				return MatchStatus.FOUND;
 			}
 		}
-		return profilesMatcher.matches(positive);
+		return getProfilesMatcher(ProfileType.POSITIVE).matches(positive);
 	}
 
 	private List<String> extractSpringProfiles(Properties properties) {
@@ -94,7 +94,7 @@ public class SpringProfileDocumentMatcher implements DocumentMatcher {
 		return profiles;
 	}
 
-	private ProfilesMatcher getProfilesMatcher() {
+	protected ProfilesMatcher getProfilesMatcher(ProfileType profileType) {
 		return this.activeProfiles.length == 0 ? new EmptyProfilesMatcher()
 				: new ActiveProfilesMatcher(
 						new HashSet<String>(Arrays.asList(this.activeProfiles)));
@@ -116,6 +116,47 @@ public class SpringProfileDocumentMatcher implements DocumentMatcher {
 			}
 		}
 		return extractedProfiles;
+	}
+
+	/**
+	 * {@link SpringProfileDocumentMatcher} to seek YAML documents for a specific
+	 * profile while accounting for a set of active profiles.
+	 */
+	public static class ForSpecificProfile extends SpringProfileDocumentMatcher {
+		private final String seekProfile;
+
+		public ForSpecificProfile(String seekProfile, String... activeProfiles) {
+			super(activeProfiles);
+			Assert.hasText(seekProfile, "cannot seek null/empty/blank profile");
+			this.seekProfile = seekProfile;
+		}
+
+		@Override
+		protected ProfilesMatcher getProfilesMatcher(ProfileType profileType) {
+			if (profileType == ProfileType.POSITIVE) {
+				return new ActiveProfilesMatcher(Collections.singleton(this.seekProfile));
+			}
+			return super.getProfilesMatcher(profileType);
+		}
+	}
+
+	/**
+	 * Special {@link SpringProfileDocumentMatcher} for use with the default profile
+	 * search.
+	 */
+	public static class ForDefaultProfile extends SpringProfileDocumentMatcher {
+
+		public ForDefaultProfile(String... profiles) {
+			super(profiles);
+		}
+
+		@Override
+		protected ProfilesMatcher getProfilesMatcher(ProfileType profileType) {
+			if (profileType == ProfileType.POSITIVE) {
+				return new EmptyProfilesMatcher();
+			}
+			return super.getProfilesMatcher(profileType);
+		}
 	}
 
 	/**

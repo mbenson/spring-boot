@@ -19,11 +19,13 @@ package org.springframework.boot.env;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.junit.Before;
 import org.junit.Test;
 
 import org.springframework.core.env.EnumerablePropertySource;
 import org.springframework.core.env.PropertySource;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,7 +38,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class YamlPropertySourceLoaderTests {
 
-	private YamlPropertySourceLoader loader = new YamlPropertySourceLoader();
+	private YamlPropertySourceLoader loader;
+
+	@Before
+	public void setup() {
+		this.loader = new YamlPropertySourceLoader();
+		this.loader.setEnvironment(new MockEnvironment());
+	}
 
 	@Test
 	public void load() throws Exception {
