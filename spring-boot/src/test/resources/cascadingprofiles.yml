@@ -1,0 +1,67 @@
+spring:
+  profiles:
+    active:
+      - A
+      - B
+
+---
+spring.profiles: A
+
+spring:
+  profiles:
+    include:
+      - C
+
+---
+spring.profiles: B
+
+spring:
+  profiles:
+    include:
+      - D
+
+---
+spring.profiles: C
+
+spring:
+  profiles:
+    include:
+      - E
+
+---
+spring.profiles: D
+
+spring:
+  profiles:
+    include:
+      - E
+
+---
+spring.profiles: E
+
+version: E
+
+---
+spring.profiles: "!A"
+
+not-a: true
+
+---
+spring.profiles: "!B"
+
+not-b: true
+
+---
+spring.profiles: "!C"
+
+not-c: true
+
+---
+spring.profiles: "!D"
+
+not-d: true
+
+---
+spring.profiles: "!E"
+
+not-e: true

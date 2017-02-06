@@ -38,7 +38,6 @@ import org.springframework.beans.factory.config.YamlProcessor;
 import org.springframework.beans.factory.config.YamlPropertiesFactoryBean;
 import org.springframework.boot.bind.PropertySourcesPropertyValues;
 import org.springframework.boot.bind.RelaxedDataBinder;
-import org.springframework.boot.context.config.ConfigFileApplicationListener;
 import org.springframework.boot.yaml.SpringProfileDocumentMatcher;
 import org.springframework.context.EnvironmentAware;
 import org.springframework.core.env.Environment;
@@ -97,7 +96,6 @@ public class YamlPropertySourceLoader implements PropertySourceLoader, Environme
 			setResources(resource);
 			Collections.addAll(this.activeProfiles,
 					YamlPropertySourceLoader.this.environment.getActiveProfiles());
-			updateDocumentMatchers();
 		}
 
 		@Override
@@ -116,60 +114,77 @@ public class YamlPropertySourceLoader implements PropertySourceLoader, Environme
 		}
 
 		public Map<String, Object> process() {
-			final Map<String, Object> result = new LinkedHashMap<String, Object>();
+			// amass profile data:
+			updateProfileDiscoveryDocumentMatchers();
+
 			process(new MatchCallback() {
+
+				@Override
+				public void process(Properties properties, Map<String, Object> map) {
+					if (updateProfiles(properties)) {
+						updateProfileDiscoveryDocumentMatchers();
+					}
+				}
+			});
+
+			final Map<String, Object> result = new LinkedHashMap<String, Object>();
+
+			String[] activeProfiles = getActiveProfiles();
+
+			if (this.profile == null) {
+				setDocumentMatchers(new SpringProfileDocumentMatcher.ForDefaultProfile(activeProfiles));
+			}
+			else {
+				setDocumentMatchers(new SpringProfileDocumentMatcher.ForSpecificProfile(this.profile, activeProfiles));
+			}
+			process(new MatchCallback() {
+
 				@Override
 				public void process(Properties properties, Map<String, Object> map) {
 					result.putAll(getFlattenedMap(map));
-
-					// possibly override active profiles from default YAML document:
-					if (Processor.this.profile == null
-							&& Processor.this.activeProfiles.isEmpty()
-							&& properties.containsKey(
-									ConfigFileApplicationListener.ACTIVE_PROFILES_PROPERTY)) {
-						Set<String> activatedProfiles = new LinkedHashSet<String>(
-								extractActiveProfiles(properties));
-						if (Processor.this.activeProfiles.addAll(activatedProfiles)) {
-							updateDocumentMatchers();
-						}
-					}
 				}
 			});
 			return result;
 		}
 
-		private void updateDocumentMatchers() {
-			String[] activeProfiles = this.activeProfiles
-					.toArray(new String[this.activeProfiles.size()]);
-			if (this.profile == null) {
-				setDocumentMatchers(new SpringProfileDocumentMatcher.ForDefaultProfile(
-						activeProfiles));
-			}
-			else {
-				setDocumentMatchers(new SpringProfileDocumentMatcher.ForSpecificProfile(
-						this.profile, activeProfiles));
-			}
+		private void updateProfileDiscoveryDocumentMatchers() {
+			setDocumentMatchers(new SpringProfileDocumentMatcher(getActiveProfiles()));
 		}
 
-		private List<String> extractActiveProfiles(Properties properties) {
-			SpringProfiles springProperties = new SpringProfiles();
+		private String[] getActiveProfiles() {
+			return this.activeProfiles.toArray(new String[this.activeProfiles.size()]);
+		}
+
+		private boolean updateProfiles(Properties properties) {
+			SpringProfiles springProfiles = extractSpringProfiles(properties);
+
+			// possibly override active profiles from default YAML document:
+			boolean active = this.profile == null && this.activeProfiles.isEmpty()
+					&& this.activeProfiles.addAll(springProfiles.getActive());
+
+			boolean include = this.activeProfiles.addAll(springProfiles.getInclude());
+
+			return active || include;
+		}
+
+		private SpringProfiles extractSpringProfiles(Properties properties) {
+			SpringProfiles result = new SpringProfiles();
 			MutablePropertySources propertySources = new MutablePropertySources();
 			propertySources
 					.addFirst(new PropertiesPropertySource("profiles", properties));
 			PropertyValues propertyValues = new PropertySourcesPropertyValues(
 					propertySources);
-			new RelaxedDataBinder(springProperties, "spring.profiles")
-					.bind(propertyValues);
-			return springProperties.getActive();
+			new RelaxedDataBinder(result, "spring.profiles").bind(propertyValues);
+			return result;
 		}
-
 	}
 
 	/**
-	 * Class for binding {@code spring.profiles.active} property.
+	 * Class for binding {@code spring.profiles.*} properties.
 	 */
 	static class SpringProfiles {
 		private List<String> active = new ArrayList<String>();
+		private List<String> include = new ArrayList<String>();
 
 		public List<String> getActive() {
 			return this.active;
@@ -177,6 +192,14 @@ public class YamlPropertySourceLoader implements PropertySourceLoader, Environme
 
 		public void setActive(List<String> active) {
 			this.active = active;
+		}
+
+		public List<String> getInclude() {
+			return this.include;
+		}
+
+		public void setInclude(List<String> include) {
+			this.include = include;
 		}
 	}
 
