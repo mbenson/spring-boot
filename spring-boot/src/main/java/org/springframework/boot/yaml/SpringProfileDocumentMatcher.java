@@ -50,6 +50,11 @@ import org.springframework.util.StringUtils;
  * @author Andy Wilkinson
  */
 public class SpringProfileDocumentMatcher implements DocumentMatcher {
+	/**
+	 * Key under which the {@link Set} of negated profiles will be
+	 * added to the tested {@link Properties} object.
+	 */
+	public static final String NEGATED_PROFILES_KEY = "spring.profiles._negated";
 
 	private String[] activeProfiles = new String[0];
 
@@ -73,6 +78,9 @@ public class SpringProfileDocumentMatcher implements DocumentMatcher {
 		Set<String> negative = extractProfiles(profiles, ProfileType.NEGATIVE);
 		Set<String> positive = extractProfiles(profiles, ProfileType.POSITIVE);
 		if (!CollectionUtils.isEmpty(negative)) {
+			// inform the caller of negated properties:
+			properties.put(NEGATED_PROFILES_KEY, negative);
+
 			if (getProfilesMatcher(ProfileType.NEGATIVE).matches(negative) == MatchStatus.FOUND) {
 				return MatchStatus.NOT_FOUND;
 			}
